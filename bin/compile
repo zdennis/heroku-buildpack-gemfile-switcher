@@ -1,0 +1,50 @@
+#!/bin/sh
+
+set -e
+
+BUILD_DIR="$1"
+ENV_DIR="$3"
+DEBUG_GEMFILE=="$(test -f $ENV_DIR/DEBUG_GEMFILE && cat $ENV_DIR/DEBUG_GEMFILE)"
+SOURCE_GEMFILE="$(test -f $ENV_DIR/GEMFILE && cat $ENV_DIR/GEMFILE)"
+SOURCE_GEMFILE_LOCK="$SOURCE_GEMFILE.lock"
+
+if [ -n "$DEBUG_GEMFILE" ]; then
+  echo "-----> heroku-buildpack-gemfile-switcher: Enabling debugging due to DEBUG_GEMFILE being set"
+  set -x
+fi
+
+echo "-----> heroku-buildpack-gemfile-switcher: Running..."
+
+if [ -z "$SOURCE_GEMFILE" ]; then
+  echo "-----> GEMFILE env var not set or is empty; skipping Gemfile switching and using default $TARGET_GEMFILE"
+  exit 0
+fi
+
+TARGET_GEMFILE="Gemfile"
+TARGET_GEMFILE_LOCK="Gemfile.lock"
+cd $BUILD_DIR
+
+if [ -f "$SOURCE_GEMFILE" ] && [ "$SOURCE_GEMFILE" != "$TARGET_GEMFILE" ]; then
+  if [ -f "$SOURCE_GEMFILE_LOCK" ]; then
+    echo "-----> heroku-buildpack-gemfile-switcher: Symlinking $SOURCE_GEMFILE to $TARGET_GEMFILE"
+    ln -sf "$SOURCE_GEMFILE" "$TARGET_GEMFILE"
+
+    echo "-----> heroku-buildpack-gemfile-switcher: Symlinking $SOURCE_GEMFILE_LOCK to $TARGET_GEMFILE_LOCK"
+    ln -sf "$SOURCE_GEMFILE_LOCK" "$TARGET_GEMFILE_LOCK"
+
+    if [ -n "$DEBUG_GEMFILE" ]; then
+      ls -l $TARGET_GEMFILE
+      ls -l $TARGET_GEMFILE_LOCK
+    fi
+  else
+    echo "-----> heroku-buildpack-gemfile-switcher:[ERROR] $SOURCE_GEMFILE.lock did not exist on disk! Cannot use $SOURCE_GEMFILE specified in GEMFILE without it."
+    exit 1
+  fi
+else
+  echo "-----> heroku-buildpack-gemfile-switcher:[ERROR] GEMFILE was set to $SOURCE_GEMFILE, but did not exist on disk or was blank!"
+  exit 1
+fi
+
+if [ -n "$DEBUG_GEMFILE" ]; then
+  echo "-----> heroku-buildpack-gemfile-switcher: Done."
+fi
